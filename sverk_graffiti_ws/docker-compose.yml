@@ -1,0 +1,99 @@
+version: '3.8'
+
+services:
+  # --------------------------------------------------------------------------
+  # Redis – общая шина сообщений для агентов и платформы
+  # --------------------------------------------------------------------------
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - sverk-net
+
+  # --------------------------------------------------------------------------
+  # Платформа Сверха: веб‑интерфейс (чат агентов + видео с VLM‑камеры)
+  # --------------------------------------------------------------------------
+  sverk-platform:
+    build: ./platform
+    ports:
+      - "3000:3000"
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - VLM_CAMERA_URL=${VLM_CAMERA_URL}            # URL видеопотока VLM-камеры
+    depends_on:
+      - redis
+    networks:
+      - sverk-net
+
+  # --------------------------------------------------------------------------
+  # Агенты (4 штуки) – каждый со своим художественным стилем
+  # --------------------------------------------------------------------------
+  agent-malevich:
+    build: ./agents/agent_malevich
+    environment:
+      - AGENT_NAME=malevich
+      - REDIS_URL=redis://redis:6379
+      - MAX_DEBATE_ROUNDS=${MAX_DEBATE_ROUNDS}
+      - CONSENSUS_THRESHOLD=${CONSENSUS_THRESHOLD}
+    depends_on:
+      - redis
+    networks:
+      - sverk-net
+
+  agent-vangogh:
+    build: ./agents/agent_vangogh
+    environment:
+      - AGENT_NAME=vangogh
+      - REDIS_URL=redis://redis:6379
+      - MAX_DEBATE_ROUNDS=${MAX_DEBATE_ROUNDS}
+      - CONSENSUS_THRESHOLD=${CONSENSUS_THRESHOLD}
+    depends_on:
+      - redis
+    networks:
+      - sverk-net
+
+  agent-escher:
+    build: ./agents/agent_escher
+    environment:
+      - AGENT_NAME=escher
+      - REDIS_URL=redis://redis:6379
+      - MAX_DEBATE_ROUNDS=${MAX_DEBATE_ROUNDS}
+      - CONSENSUS_THRESHOLD=${CONSENSUS_THRESHOLD}
+    depends_on:
+      - redis
+    networks:
+      - sverk-net
+
+  agent-lichtenstein:
+    build: ./agents/agent_lichtenstein
+    environment:
+      - AGENT_NAME=lichtenstein
+      - REDIS_URL=redis://redis:6379
+      - MAX_DEBATE_ROUNDS=${MAX_DEBATE_ROUNDS}
+      - CONSENSUS_THRESHOLD=${CONSENSUS_THRESHOLD}
+    depends_on:
+      - redis
+    networks:
+      - sverk-net
+
+  # --------------------------------------------------------------------------
+  # ROS2‑мост: связь с реальными дронами, выполнение рисунка, kill switch
+  # --------------------------------------------------------------------------
+  ros2-bridge:
+    build: ./ros2_bridge
+    environment:
+      - REDIS_URL=redis://localhost:6379          # Redis доступен через проброс порта
+      - CANVAS_WIDTH=${CANVAS_WIDTH}              # ширина полотна, м
+      - CANVAS_HEIGHT=${CANVAS_HEIGHT}            # высота полотна, м
+      - CANVAS_BOTTOM=${CANVAS_BOTTOM}            # высота нижнего края над полом, м
+      - MIN_BATTERY=${MIN_BATTERY}                # мин. заряд батареи, %
+      - KILL_SWITCH_TOPIC=${KILL_SWITCH_TOPIC}    # топик аварийного останова
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}            # домен ROS2
+    network_mode: "host"                          # прямой доступ к ROS2‑сети дронов
+    depends_on:
+      - redis
+
+networks:
+  sverk-net:
+    driver: bridge
